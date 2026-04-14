@@ -221,6 +221,10 @@
       }
     });
 
+    window.addEventListener('online', () => {
+      fetchData(); // ★ここが自動リロードの正体
+    });
+
     // Initialize
     window.onload = fetchData;
   </script>
