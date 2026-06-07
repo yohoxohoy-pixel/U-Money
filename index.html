@@ -153,11 +153,15 @@
     }
 
     // データ取得関数（キャッシュ制御入り）
+    // データ取得関数（キャッシュ制御入り）
     async function fetchData() {
+      // 処理開始時に念のためスピナーを表示
+      showLoading(); 
+      
       const weather = document.getElementById('currentWeather').value;
       const now = new Date();
       
-      // キャッシュキーの生成: 例 "umoney_2026-6-7_23_Clear"
+      // キャッシュキーの生成
       const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
       const hourKey = now.getHours();
       const cacheKey = `umoney_${dateKey}_${hourKey}_${weather}`;
@@ -167,11 +171,13 @@
       if (cachedResponse) {
         console.log("Loaded from cache:", cacheKey);
         renderData(JSON.parse(cachedResponse).data);
-        return; // キャッシュがあればここで処理を終了（通信しない）
+        
+        // ★修正ポイント：キャッシュヒット時にもスピナーを隠す処理を追加
+        hideLoading(); 
+        return; 
       }
 
       // 2. キャッシュがない場合のみ通信
-      showLoading();
       try {
         const response = await fetch(`${GAS_URL}?weather=${weather}`);
         const result = await response.json();
@@ -187,6 +193,7 @@
       } catch (error) {
         console.error('Fetch Error:', error);
       } finally {
+        // 通信が終わった場合もスピナーを隠す
         hideLoading();
       }
     }
