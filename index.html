@@ -143,19 +143,44 @@
     function showLoading() { overlay.style.display = 'flex'; }
     function hideLoading() { overlay.style.display = 'none'; }
 
+    // UIにデータを反映する共通関数
+    function renderData(data) {
+      document.getElementById('targetWage').innerText = data.target.toLocaleString();
+      document.getElementById('line30').innerText = data.line30.toLocaleString();
+      document.getElementById('line40').innerText = data.line40.toLocaleString();
+      document.getElementById('baseWage').innerText = data.base.toLocaleString();
+      document.getElementById('currentMultiplier').innerText = data.multiplier;
+    }
+
+    // データ取得関数（キャッシュ制御入り）
     async function fetchData() {
-      showLoading();
       const weather = document.getElementById('currentWeather').value;
+      const now = new Date();
+      
+      // キャッシュキーの生成: 例 "umoney_2026-6-7_23_Clear"
+      const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+      const hourKey = now.getHours();
+      const cacheKey = `umoney_${dateKey}_${hourKey}_${weather}`;
+      
+      // 1. キャッシュの確認
+      const cachedResponse = localStorage.getItem(cacheKey);
+      if (cachedResponse) {
+        console.log("Loaded from cache:", cacheKey);
+        renderData(JSON.parse(cachedResponse).data);
+        return; // キャッシュがあればここで処理を終了（通信しない）
+      }
+
+      // 2. キャッシュがない場合のみ通信
+      showLoading();
       try {
         const response = await fetch(`${GAS_URL}?weather=${weather}`);
         const result = await response.json();
         
         if (result.status === 'success') {
-          document.getElementById('targetWage').innerText = result.data.target.toLocaleString();
-          document.getElementById('line30').innerText = result.data.line30.toLocaleString();
-          document.getElementById('line40').innerText = result.data.line40.toLocaleString();
-          document.getElementById('baseWage').innerText = result.data.base.toLocaleString();
-          document.getElementById('currentMultiplier').innerText = result.data.multiplier;
+          // 成功したデータをローカルに保存
+          localStorage.setItem(cacheKey, JSON.stringify(result));
+          console.log("Fetched from GAS and cached:", cacheKey);
+          renderData(result.data);
         } else {
           alert('Error loading data.');
         }
@@ -166,6 +191,7 @@
       }
     }
 
+    // データ送信
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       submitBtn.disabled = true;
@@ -191,6 +217,9 @@
         if (result.status === 'success') {
           form.reset();
           document.getElementById('dateInput').valueAsDate = new Date();
+          
+          // ★重要：新データが入ったため、過去のキャッシュをすべてクリアして最新のトレンドを反映させる
+          localStorage.clear();
           
           const dashboardTab = new bootstrap.Tab(document.querySelector('#dashboard-tab'));
           dashboardTab.show();
