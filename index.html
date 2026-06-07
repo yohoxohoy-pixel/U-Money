@@ -3,63 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>U-Money</title>
+  <title>U-Money V3</title>
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#212529">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="icon" href="favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <style>
-    /* 縦スクロール禁止・全画面固定 */
     html, body {
       height: 100%;
       overflow: hidden;
       background-color: #f8f9fa;
       touch-action: none;
     }
-    .main-container {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-    }
-    .content-area {
-      flex: 1;
-      overflow: hidden;
-    }
-    /* ローディングスピナーのオーバーレイ */
+    .main-container { height: 100%; display: flex; flex-direction: column; }
+    .content-area { flex: 1; overflow-y: auto; overflow-x: hidden; }
     #loadingOverlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(255, 255, 255, 0.85);
-      z-index: 1050;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(255, 255, 255, 0.85); z-index: 1050;
+      display: flex; justify-content: center; align-items: center;
     }
     .value-box {
-      background: #ffffff;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 15px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      background: #ffffff; border-radius: 12px; padding: 20px;
+      margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    .value-label {
-      font-size: 0.9rem;
-      color: #6c757d;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .value-data {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #212529;
-    }
+    .value-label { font-size: 0.9rem; color: #6c757d; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .value-data { font-size: 2rem; font-weight: 700; color: #212529; }
     .accent-30 { color: #0d6efd; }
     .accent-40 { color: #dc3545; }
+    .status-text { font-size: 0.85rem; font-weight: 500; color: #6c757d; }
   </style>
 </head>
 <body>
@@ -71,22 +41,32 @@
   </div>
 
   <div class="main-container">
-    <div class="bg-dark text-white text-center py-3">
+    <div class="bg-dark text-white text-center py-3 shadow-sm">
       <h4 class="mb-0 fw-bold">U-Money</h4>
     </div>
 
     <ul class="nav nav-tabs nav-justified bg-white" id="appTabs" role="tablist">
       <li class="nav-item" role="presentation">
-        <button class="nav-link active fw-bold text-dark" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-selected="true">Dashboard</button>
+        <button class="nav-link active fw-bold text-dark" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">Dashboard</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link fw-bold text-dark" id="input-tab" data-bs-toggle="tab" data-bs-target="#input" type="button" role="tab" aria-selected="false">Input Data</button>
+        <button class="nav-link fw-bold text-dark" id="input-tab" data-bs-toggle="tab" data-bs-target="#input" type="button" role="tab">Input Data</button>
       </li>
     </ul>
 
     <div class="tab-content content-area p-3" id="appTabsContent">
       
       <div class="tab-pane fade show active h-100" id="dashboard" role="tabpanel">
+        
+        <div class="mb-3">
+          <select class="form-select fw-bold bg-white shadow-sm" id="currentWeather" onchange="fetchData()">
+            <option value="Clear">☀️ Clear / Cloudy</option>
+            <option value="Rain">☔ Rain</option>
+            <option value="HeavyRain">🌊 Heavy Rain</option>
+            <option value="Snow">❄️ Snow</option>
+          </select>
+        </div>
+
         <div class="value-box text-center">
           <div class="value-label">Target Hourly Wage</div>
           <div class="value-data">JPY <span id="targetWage">---</span></div>
@@ -99,30 +79,44 @@
           <div class="value-label text-danger">40 Min Line (Risk)</div>
           <div class="value-data accent-40">JPY <span id="line40">---</span></div>
         </div>
-        <div class="text-center mt-4">
-          <button class="btn btn-outline-secondary w-100 py-2" onclick="fetchData()">Refresh Target</button>
+        
+        <div class="text-center mt-3 status-text">
+          Trend Base: JPY <span id="baseWage">---</span> / Multiplier: x<span id="currentMultiplier">-.-</span>
+        </div>
+
+        <div class="text-center mt-3">
+          <button class="btn btn-outline-secondary w-100 py-2 fw-bold" onclick="fetchData()">Refresh Target</button>
         </div>
       </div>
 
       <div class="tab-pane fade h-100" id="input" role="tabpanel">
         <form id="dataForm">
           <div class="mb-3">
-            <label for="dateInput" class="form-label fw-bold text-secondary">Date</label>
+            <label class="form-label fw-bold text-secondary">Date</label>
             <input type="date" class="form-control form-control-lg" id="dateInput" required>
           </div>
           <div class="mb-3">
-            <label for="salesInput" class="form-label fw-bold text-secondary">Sales (JPY)</label>
+            <label class="form-label fw-bold text-secondary">Sales (JPY)</label>
             <input type="number" class="form-control form-control-lg" id="salesInput" placeholder="e.g. 15000" required>
           </div>
           <div class="mb-3">
-            <label for="deliveriesInput" class="form-label fw-bold text-secondary">Deliveries</label>
+            <label class="form-label fw-bold text-secondary">Deliveries</label>
             <input type="number" class="form-control form-control-lg" id="deliveriesInput" placeholder="e.g. 25" required>
           </div>
-          <div class="mb-4">
-            <label for="hoursInput" class="form-label fw-bold text-secondary">Online Hours</label>
+          <div class="mb-3">
+            <label class="form-label fw-bold text-secondary">Online Hours</label>
             <input type="number" step="0.1" class="form-control form-control-lg" id="hoursInput" placeholder="e.g. 7.5" required>
           </div>
-          <button type="submit" id="submitBtn" class="btn btn-dark w-100 py-3 fw-bold">Submit Data</button>
+          <div class="mb-4">
+            <label class="form-label fw-bold text-secondary">Weather (During Shift)</label>
+            <select class="form-select form-select-lg" id="recordedWeather">
+              <option value="Clear">Clear / Cloudy</option>
+              <option value="Rain">Rain</option>
+              <option value="HeavyRain">Heavy Rain</option>
+              <option value="Snow">Snow</option>
+            </select>
+          </div>
+          <button type="submit" id="submitBtn" class="btn btn-dark w-100 py-3 fw-bold mb-4">Submit Data</button>
         </form>
       </div>
 
@@ -133,37 +127,35 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => console.log('SW registered'))
-          .catch(err => console.log('SW registration failed', err));
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed', err));
       });
     }
 
     // === GASのウェブアプリURLをここに設定 ===
     const GAS_URL = 'https://script.google.com/macros/s/AKfycby8lz4TyuvdFk3rnsY9W0WVr0orVDZYTZp9J2uf7JOfTgasVBMxICY6T0LwIFJ_ngMqew/exec';
 
-    // UI Elements
     const overlay = document.getElementById('loadingOverlay');
     const form = document.getElementById('dataForm');
     const submitBtn = document.getElementById('submitBtn');
     
-    // Set today's date automatically
     document.getElementById('dateInput').valueAsDate = new Date();
 
     function showLoading() { overlay.style.display = 'flex'; }
     function hideLoading() { overlay.style.display = 'none'; }
 
-    // Fetch Target Data on Load
     async function fetchData() {
       showLoading();
+      const weather = document.getElementById('currentWeather').value;
       try {
-        const response = await fetch(GAS_URL);
+        const response = await fetch(`${GAS_URL}?weather=${weather}`);
         const result = await response.json();
         
         if (result.status === 'success') {
           document.getElementById('targetWage').innerText = result.data.target.toLocaleString();
           document.getElementById('line30').innerText = result.data.line30.toLocaleString();
           document.getElementById('line40').innerText = result.data.line40.toLocaleString();
+          document.getElementById('baseWage').innerText = result.data.base.toLocaleString();
+          document.getElementById('currentMultiplier').innerText = result.data.multiplier;
         } else {
           alert('Error loading data.');
         }
@@ -174,11 +166,8 @@
       }
     }
 
-    // Submit Daily Data
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
-      // Prevent duplicate submission
       submitBtn.disabled = true;
       showLoading();
 
@@ -186,13 +175,13 @@
         date: document.getElementById('dateInput').value,
         sales: document.getElementById('salesInput').value,
         deliveries: document.getElementById('deliveriesInput').value,
-        hours: document.getElementById('hoursInput').value
+        hours: document.getElementById('hoursInput').value,
+        weather: document.getElementById('recordedWeather').value
       };
 
       try {
         const response = await fetch(GAS_URL, {
           method: 'POST',
-          // text/plain prevents CORS preflight issues from GitHub Pages
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
@@ -203,11 +192,9 @@
           form.reset();
           document.getElementById('dateInput').valueAsDate = new Date();
           
-          // Switch back to Dashboard Tab
           const dashboardTab = new bootstrap.Tab(document.querySelector('#dashboard-tab'));
           dashboardTab.show();
           
-          // Refresh limits based on new data
           await fetchData();
         } else {
           alert('Submission failed: ' + result.message);
@@ -221,11 +208,7 @@
       }
     });
 
-    window.addEventListener('online', () => {
-      fetchData(); // ★ここが自動リロードの正体
-    });
-
-    // Initialize
+    window.addEventListener('online', fetchData);
     window.onload = fetchData;
   </script>
 </body>
