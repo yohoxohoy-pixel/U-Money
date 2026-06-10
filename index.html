@@ -125,96 +125,93 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    // 開発中のPWAキャッシュの罠を防ぐため、テスト中はService Workerを無効化（または更新）します
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.update(); // 常に最新のワーカーを取得
-        }
+        for(let registration of registrations) registration.update();
       });
     }
 
     // === GASのウェブアプリURLをここに設定 ===
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyd_GUwLnQrQ5LVrWeGpPZaKZm2FoN3KPcz5pZ6BWYTD6dekDs08QL6t3P_ftKz4Ezhmw/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbywC5VHCt5Wp9Y8gn3hjsukVouNzeed9bQSntXSW4VCFCF26qg5vCw6oS3QpZZAtVtXlA/exec';
 
     const overlay = document.getElementById('loadingOverlay');
     const form = document.getElementById('dataForm');
     const submitBtn = document.getElementById('submitBtn');
     
-    // 日付の初期化
-    const dateInput = document.getElementById('dateInput');
-    if(dateInput) dateInput.valueAsDate = new Date();
+    // 日付を「YYYY-MM-DD」形式で取得する便利関数
+    function getFormattedDate(dateObj) {
+      const y = dateObj.getFullYear();
+      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
 
-    // ★安全装置：何が起きても5秒後に必ずローディングを消す
+    const dateInput = document.getElementById('dateInput');
+    if(dateInput) dateInput.value = getFormattedDate(new Date());
+
     let loadingTimeout;
     function showLoading() { 
       if(overlay) overlay.style.display = 'flex'; 
-      loadingTimeout = setTimeout(hideLoading, 5000); // 5秒のタイムアウト
+      loadingTimeout = setTimeout(hideLoading, 5000); 
     }
     function hideLoading() { 
       if(overlay) overlay.style.display = 'none'; 
       clearTimeout(loadingTimeout);
     }
 
-    // UIにデータを反映する関数
-    function renderData(data) {
+    // ★ renderDataに「今日の日付文字列」を渡せるように変更
+    function renderData(data, todayStr) {
       if (!data) return;
       document.getElementById('targetWage').innerText = (data.target || 0).toLocaleString();
       document.getElementById('line30').innerText = (data.line30 || 0).toLocaleString();
       document.getElementById('line40').innerText = (data.line40 || 0).toLocaleString();
       document.getElementById('baseWage').innerText = (data.base || 0).toLocaleString();
       document.getElementById('currentMultiplier').innerText = data.multiplier || "1.00";
+      
+      // ★送信用に、「その日付専用のキー」で予測Baseを保存
+      if(todayStr) {
+        localStorage.setItem(`predBase_${todayStr}`, data.base || 1500);
+      }
     }
 
-    // データ取得関数（新・キャッシュ連動システム）
     async function fetchData() {
       const weatherSelect = document.getElementById('currentWeather');
       const weather = weatherSelect ? weatherSelect.value : 'Clear';
-      
       const now = new Date();
-      const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-      const hourKey = now.getHours();
-      const cacheKey = `umoney_${dateKey}_${hourKey}_${weather}`;
+      const todayStr = getFormattedDate(now);
+      const cacheKey = `umoney_${todayStr}_${now.getHours()}_${weather}`;
       
-      // 【変更点】1. まずキャッシュの存在をチェック（ローディングは出さない）
       const cachedResponse = localStorage.getItem(cacheKey);
       if (cachedResponse) {
         try {
           const parsedCache = JSON.parse(cachedResponse);
           if (parsedCache && parsedCache.data) {
-            console.log("⚡ Instant load from cache:", cacheKey);
-            renderData(parsedCache.data);
-            hideLoading(); // 念のための非表示
-            return; // ここで処理を終了するため通信もローディングも発生しない
+            console.log("⚡ Loaded from cache");
+            renderData(parsedCache.data, todayStr);
+            hideLoading();
+            return;
           }
         } catch (e) {
-          console.error("Cache parsing error", e);
-          localStorage.removeItem(cacheKey); // キャッシュが壊れていたら消す
+          localStorage.removeItem(cacheKey);
         }
       }
 
-      // 【変更点】2. キャッシュが無い場合のみ、ローディングを出して通信開始
       showLoading();
       try {
         const response = await fetch(`${GAS_URL}?weather=${weather}`);
         const result = await response.json();
-        
         if (result.status === 'success') {
           localStorage.setItem(cacheKey, JSON.stringify(result));
-          console.log("☁️ Fetched from GAS and cached:", cacheKey);
-          renderData(result.data);
-        } else {
-          console.error('GAS Error:', result.message);
+          console.log("☁️ Fetched from GAS");
+          renderData(result.data, todayStr);
         }
       } catch (error) {
         console.error('FetchData Error:', error);
       } finally {
-        // 通信が終わったら必ず消す
         hideLoading();
       }
     }
 
-    // データ送信
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -222,12 +219,19 @@
         showLoading();
 
         try {
+          // フォームで選択されている日付を取得
+          const selectedDate = document.getElementById('dateInput').value;
+          
+          // ★選択された日付の予測Baseを引っ張り出す（無ければ1500）
+          const savedBase = localStorage.getItem(`predBase_${selectedDate}`) || 1500;
+
           const payload = {
-            date: document.getElementById('dateInput').value,
+            date: selectedDate,
             sales: document.getElementById('salesInput').value,
             deliveries: document.getElementById('deliveriesInput').value,
             hours: document.getElementById('hoursInput').value,
-            weather: document.getElementById('recordedWeather') ? document.getElementById('recordedWeather').value : 'Clear'
+            weather: document.getElementById('recordedWeather') ? document.getElementById('recordedWeather').value : 'Clear',
+            predicted_base: savedBase // 正しい日付のBaseが送られる
           };
 
           const response = await fetch(GAS_URL, {
@@ -235,28 +239,27 @@
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
           });
-          
           const result = await response.json();
           
           if (result.status === 'success') {
             form.reset();
-            if(dateInput) dateInput.valueAsDate = new Date();
+            // 送信後は、現在の実際の日付に戻す
+            if(dateInput) dateInput.value = getFormattedDate(new Date());
             
-            // 新データが入ったため全キャッシュクリア
-            localStorage.clear();
+            // ★キャッシュリセット（ただし、過去の予測Base記録は保持するよう一部だけクリア）
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('umoney_')) localStorage.removeItem(key);
+            });
             
             const dashTabEl = document.querySelector('#dashboard-tab');
             if (dashTabEl && typeof bootstrap !== 'undefined') {
-              const dashboardTab = new bootstrap.Tab(dashTabEl);
-              dashboardTab.show();
+              new bootstrap.Tab(dashTabEl).show();
             }
-            
             await fetchData();
           } else {
             alert('Submission failed: ' + result.message);
           }
         } catch (error) {
-          console.error('Submit Error:', error);
           alert('ネットワークエラーが発生しました。');
         } finally {
           submitBtn.disabled = false;
@@ -265,13 +268,7 @@
       });
     }
 
-    // 読み込み完了時
-    document.addEventListener("DOMContentLoaded", () => {
-      // 少しだけ遅延させて初期化（UIのレンダリングを優先させるため）
-      setTimeout(fetchData, 100);
-    });
-    
-    // オフラインからオンライン復帰時
+    document.addEventListener("DOMContentLoaded", () => setTimeout(fetchData, 100));
     window.addEventListener('online', fetchData);
   </script>
 </body>
